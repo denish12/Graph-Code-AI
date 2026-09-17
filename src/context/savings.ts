@@ -86,8 +86,7 @@ export function setInputRate(usdPerMtok: number | null): void {
  * Carries this call's dollar value once a rate has been measured, because the
  * agent has no way to price a token itself — the ask it's given has to contain
  * the number, not just request one. The example phrasing stays inside what
- * `hasSavingsTally` (claude/tally.ts) recognises, so adding money here does not
- * quietly zero the reported-turns metric. */
+ * remains human-readable when a price is available. */
 export function savingsTurnNudge(savedTokens: number): string {
   const sum = ' — sum each such line across your graft calls — e.g. ';
   if (inputRateUsdPerMtok === null || savedTokens <= 0) {

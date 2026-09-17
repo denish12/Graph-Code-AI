@@ -12,7 +12,7 @@
  * The shim is the same one Claude Code and Codex use (`hooksShim`): it locates
  * the installed `@nanonets/graft` package and calls `hooks.js`' `main(argv[2])`,
  * so the sub-command in each entry (`cursor-post-tool`, `cursor-mcp`,
- * `cursor-session-end`) routes to the matching handler in `../claude/hooks.ts`.
+ * routes to the matching handler in `../claude/hooks.ts`.
  *
  * Events, confirmed against the Cursor hooks docs (the matcher/tool-name shape
  * is load-bearing, so it is read from the docs, not guessed):
@@ -20,7 +20,6 @@
  *     vs a graft-CLI Shell call; MCP tools are skipped here so they aren't
  *     double-counted against `afterMCPExecution`.
  *   - `afterMCPExecution` → the graft MCP calls, savings parsed from `result_json`.
- *   - `sessionEnd` → roll the closed session up into `session_summary` as Cursor.
  */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -55,22 +54,20 @@ export function cursorHookTargets(repo: string): PlannedWrite[] {
     {
       hostId: 'cursor', id: 'cursor-hooks',
       path: configPathFor(repo),
-      scope: 'repo', kind: 'hook', what: 'postToolUse / afterMCPExecution / sessionEnd',
+      scope: 'repo', kind: 'hook', what: 'postToolUse / afterMCPExecution',
     },
   ];
 }
 
 /**
  * The graft hook entries Cursor should carry. `matcher` is set only where Cursor
- * filters by tool (postToolUse); `afterMCPExecution` fires for every MCP tool and
- * `sessionEnd` for none, so they carry no matcher.
+ * filters by tool (postToolUse); `afterMCPExecution` fires for every MCP tool.
  */
 interface DesiredEntry { event: string; matcher?: string; sub: string; }
 function desiredEntries(): DesiredEntry[] {
   return [
     { event: 'postToolUse', matcher: 'Read|Grep|Glob|Search|Shell', sub: 'cursor-post-tool' },
     { event: 'afterMCPExecution', sub: 'cursor-mcp' },
-    { event: 'sessionEnd', sub: 'cursor-session-end' },
   ];
 }
 
@@ -101,6 +98,11 @@ export function installCursorHooks(repo: string): ConfigWrite[] {
     const command = `node "${shimPath}" ${d.sub}`;
     const entry = d.matcher ? { matcher: d.matcher, command } : { command };
     hooks[d.event] = [...prior.filter((e) => !isGraftEntry(e)), entry];
+  }
+  if (Array.isArray(hooks.sessionEnd)) {
+    const remaining = hooks.sessionEnd.filter((entry: unknown) => !isGraftEntry(entry));
+    if (remaining.length) hooks.sessionEnd = remaining;
+    else delete hooks.sessionEnd;
   }
 
   if (JSON.stringify(root) === before) return [shimWrite, { id: 'cursor-hooks', path: cfgPath, action: 'unchanged' }];

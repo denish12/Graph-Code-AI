@@ -6,7 +6,7 @@
  *
  * The counters (`graftReads`, `sourceReads`, `savedTokens`) already live on
  * {@link SessionState}; before this module nothing ever incremented the first
- * two, so `session_summary` telemetry shipped 0/0 for every session. Everything
+ * two, so local session stats showed 0/0 for every session. Everything
  * here is a pure classify + read-modify-write over `graft/.cache/session/`, so a
  * host adapter is a few lines: parse its payload, call {@link recordToolUse}.
  *
@@ -34,7 +34,6 @@ import { join } from 'node:path';
 import { sumSavingsFooters } from '../context/savings.js';
 import { dollarsSaved, formatDollars } from '../context/price.js';
 import { readSession, writeSession, sessionDir, listSessionIds, type SessionState } from './state.js';
-import type { AgentHost } from '../telemetry/contract.js';
 import { GRAFT_MCP_TOOL_NAMES } from '../mcp/tool-names.js';
 
 export type ToolKind = 'graft' | 'source';
@@ -108,9 +107,6 @@ export interface ToolUse {
   kind?: ToolKind | null;
   /** Tokens the retrieval saved, parsed from its footer. Added to the running total. */
   savedTokens?: number;
-  /** The host recording this use. Stamped on the session file (once) so the
-   * `session_summary` is attributed correctly no matter which host later flushes it. */
-  host?: AgentHost;
 }
 
 /**
@@ -133,12 +129,6 @@ export function recordToolUse(dir: string, sessionId: string, use: ToolUse): voi
   if (use.kind === 'graft') s.graftReads = (s.graftReads ?? 0) + 1;
   else if (use.kind === 'source') s.sourceReads = (s.sourceReads ?? 0) + 1;
   if (saved > 0) s.savedTokens = (s.savedTokens ?? 0) + saved;
-  // A graft use owes a tally in this turn's reply; the Stop hook (countTallyTurn)
-  // resolves whether it got one and clears the flag. A flag, not a count — a turn
-  // with several graft calls is still one reply to the user.
-  if (use.kind === 'graft') s.turnUsedGraft = true;
-  // Stamp the host once; the first tool use that lands owns the attribution.
-  if (use.host && !s.host) s.host = use.host;
   writeSession(dir, id, s);
 }
 

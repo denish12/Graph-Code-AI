@@ -5,7 +5,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { savingsFor, savingsLine, withSavings, toTokens, setInputRate } from '../src/context/savings.js';
-import { hasSavingsTally } from '../src/claude/tally.js';
 import type { GraphV1, NodeV1 } from '../src/graph/types.js';
 
 function fileNode(path: string, chars?: number): NodeV1 {
@@ -105,12 +104,6 @@ test('a priced nudge still leaves exactly one number for the accumulator', () =>
   const footer = savingsLine('x'.repeat(400), { files: 2, baselineChars: 8000 });
   assert.equal((footer.match(/\[graft\] tokens saved ≈ [\d,]+/g) ?? []).length, 1);
   setInputRate(null);
-});
-
-test('a priced nudge still matches the reported-turns tally regex', () => {
-  // Adding money to the example must not quietly zero `reportedTurns`, which
-  // measures whether the agent told the user anything at all.
-  assert.equal(hasSavingsTally('🌱 graft saved ~12,400 tokens (~$0.04) this turn'), true);
 });
 
 test('setInputRate refuses a rate that would render as $NaN', () => {

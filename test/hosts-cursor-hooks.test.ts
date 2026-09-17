@@ -35,16 +35,15 @@ test('writes shim + hooks.json (version 1), idempotent on re-run', () => {
   const sub = (event: string) => cfg.hooks[event][0].command.match(/cjs" (\S+)$/)?.[1];
   assert.equal(sub('postToolUse'), 'cursor-post-tool');
   assert.equal(sub('afterMCPExecution'), 'cursor-mcp');
-  assert.equal(sub('sessionEnd'), 'cursor-session-end');
-  // postToolUse filters to the read/shell tools; the MCP + end hooks take every event.
+  assert.equal(cfg.hooks.sessionEnd, undefined);
+  // postToolUse filters to the read/shell tools; the MCP hook takes every event.
   assert.match(cfg.hooks.postToolUse[0].matcher, /Read\|Grep\|Glob\|Search\|Shell/);
   assert.ok(!('matcher' in cfg.hooks.afterMCPExecution[0]), 'no matcher on afterMCPExecution');
-  assert.ok(!('matcher' in cfg.hooks.sessionEnd[0]), 'no matcher on sessionEnd');
 
   const again = installCursorHooks(repo);
   assert.deepEqual(again.map((x) => x.action), ['unchanged', 'unchanged'], 'idempotent');
   const after = JSON.parse(readFileSync(cfgPath(repo), 'utf8'));
-  for (const ev of ['postToolUse', 'afterMCPExecution', 'sessionEnd'])
+  for (const ev of ['postToolUse', 'afterMCPExecution'])
     assert.equal(after.hooks[ev].length, 1, `${ev} not duplicated on re-run`);
 });
 
@@ -58,6 +57,10 @@ test('foreign hook entries and a pre-existing version are preserved; stale graft
         { command: 'other-tool.sh' },
         { command: 'node /old/graft-hooks.cjs cursor-post-tool' },
       ],
+      sessionEnd: [
+        { command: 'foreign-end.sh' },
+        { command: 'node /old/graft-hooks.cjs cursor-session-end' },
+      ],
     },
   }));
   installCursorHooks(repo);
@@ -66,6 +69,8 @@ test('foreign hook entries and a pre-existing version are preserved; stale graft
   assert.ok(entries.some((e: any) => e.command === 'other-tool.sh'), 'foreign entry preserved');
   assert.ok(entries.some((e: any) => /graft-hooks\.cjs" cursor-post-tool$/.test(e.command)), 'fresh graft entry present');
   assert.ok(!JSON.stringify(entries).includes('/old/'), 'stale graft entry removed');
+  const end = JSON.parse(readFileSync(cfgPath(repo), 'utf8')).hooks.sessionEnd;
+  assert.deepEqual(end, [{ command: 'foreign-end.sh' }], 'obsolete analytics hook removed; foreign hook preserved');
 });
 
 test('unparseable hooks.json is never rewritten', () => {
