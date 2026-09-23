@@ -2,8 +2,6 @@ name: Scorecard analysis
 on:
   push:
     branches: [main]
-  schedule:
-    - cron: '30 2 * * 1'
   workflow_dispatch:
 
 permissions: read-all
